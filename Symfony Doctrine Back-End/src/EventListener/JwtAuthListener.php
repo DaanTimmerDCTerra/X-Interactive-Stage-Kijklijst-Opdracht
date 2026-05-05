@@ -8,7 +8,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 
 class JwtAuthListener
 {
-    private array $protectedPrefixes = ['/api/titles'];
+    private array $protectedPrefixes = ['/api/titles', '/api/genres'];
 
     public function __construct(private JwtService $jwt) {}
 
@@ -37,7 +37,7 @@ class JwtAuthListener
 
         try {
             $decoded = $this->jwt->decode($token);
-            $request->attributes->set('jwt_payload', $decoded);
+            $request->attributes->set('jwtPayload', $decoded);
         } catch (\Exception) {
             $event->setResponse(new JsonResponse(['error' => 'Invalid or expired token'], 401));
         }
