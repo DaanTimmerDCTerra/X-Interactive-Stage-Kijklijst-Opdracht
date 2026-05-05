@@ -1,0 +1,5 @@
+﻿node_modules/
+Symfony Doctrine Back-End/var/
+Symfony Doctrine Back-End/vendor/
+React Front-End/node_modules/
+React Front-End/dist/
