@@ -19,6 +19,12 @@ class User
     #[ORM\Column(length: 255)]
     private ?string $password = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $profilePicture = null;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $bestSnakeScore = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -43,6 +49,28 @@ class User
     public function setPassword(string $password): static
     {
         $this->password = $password;
+        return $this;
+    }
+
+    public function getProfilePicture(): ?string
+    {
+        return $this->profilePicture;
+    }
+
+    public function setProfilePicture(?string $profilePicture): static
+    {
+        $this->profilePicture = $profilePicture;
+        return $this;
+    }
+
+    public function getBestSnakeScore(): int
+    {
+        return $this->bestSnakeScore;
+    }
+
+    public function setBestSnakeScore(int $bestSnakeScore): static
+    {
+        $this->bestSnakeScore = $bestSnakeScore;
         return $this;
     }
 }
