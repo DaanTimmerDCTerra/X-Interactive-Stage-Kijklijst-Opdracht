@@ -3,21 +3,20 @@
 namespace App\Controller;
 
 use App\Entity\Genre;
-use App\Repository\GenreRepository;
 use App\Service\DataService;
 use App\Service\SerializerService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/genres')]
-class GenreController extends AbstractController
+final class GenreController extends ApiController
 {
+    private const MAX_GENRE_NAME_LENGTH = 100;
+
     public function __construct(
-        private GenreRepository $genreRepository,
-        private DataService $dataService,
-        private SerializerService $serializer,
+        private readonly DataService $dataService,
+        private readonly SerializerService $serializer,
     ) {}
 
     #[Route('', methods: ['GET'])]
@@ -30,19 +29,23 @@ class GenreController extends AbstractController
     #[Route('', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        $body = json_decode($request->getContent(), true);
-
-        if (empty($body['name'])) {
-            return $this->json(['error' => 'Naam is verplicht'], 400);
+        $body = $this->jsonBody($request);
+        if ($body instanceof JsonResponse) {
+            return $body;
         }
 
-        $existing = $this->dataService->findOneBy(Genre::class, ['name' => trim($body['name'])]);
+        $name = $this->normalizeName($body['name'] ?? null);
+        if ($name === null) {
+            return $this->badRequest('Naam is verplicht');
+        }
+
+        $existing = $this->dataService->findOneBy(Genre::class, ['name' => $name]);
         if ($existing) {
             return $this->json(['error' => 'Dit genre bestaat al', 'id' => $existing->getId(), 'name' => $existing->getName()], 409);
         }
 
         $genre = new Genre();
-        $genre->setName(trim($body['name']));
+        $genre->setName($name);
 
         $this->dataService->persistAndFlush($genre);
 
@@ -54,5 +57,20 @@ class GenreController extends AbstractController
     {
         $this->dataService->removeAndFlush($genre);
         return $this->json(null, 204);
+    }
+
+    private function normalizeName(mixed $name): ?string
+    {
+        if (!is_string($name)) {
+            return null;
+        }
+
+        $name = trim($name);
+
+        if ($name === '' || mb_strlen($name) > self::MAX_GENRE_NAME_LENGTH) {
+            return null;
+        }
+
+        return $name;
     }
 }
