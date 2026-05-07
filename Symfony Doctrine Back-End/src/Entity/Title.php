@@ -27,12 +27,6 @@ class Title
     #[ORM\Column]
     private ?bool $watched = null;
 
-    #[ORM\Column(nullable: true)]
-    private ?int $rating = null;
-
-    #[ORM\Column]
-    private ?bool $public = false;
-
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $thumbnail = null;
 
@@ -108,28 +102,6 @@ class Title
     public function setUser(User $user): static
     {
         $this->user = $user;
-        return $this;
-    }
-
-    public function getRating(): ?int
-    {
-        return $this->rating;
-    }
-
-    public function setRating(?int $rating): static
-    {
-        $this->rating = $rating;
-        return $this;
-    }
-
-    public function isPublic(): ?bool
-    {
-        return $this->public;
-    }
-
-    public function setPublic(bool $public): static
-    {
-        $this->public = $public;
         return $this;
     }
 
