@@ -8,7 +8,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 
 class JwtAuthListener
 {
-    private array $protectedPrefixes = ['/api/titles', '/api/genres'];
+    private const PROTECTED_PREFIXES = ['/api/titles', '/api/genres', '/api/profile', '/api/snake'];
 
     public function __construct(private JwtService $jwt) {}
 
@@ -17,8 +17,12 @@ class JwtAuthListener
         $request = $event->getRequest();
         $path = $request->getPathInfo();
 
+        if ($request->isMethod('OPTIONS')) {
+            return;
+        }
+
         $isProtected = array_filter(
-            $this->protectedPrefixes,
+            self::PROTECTED_PREFIXES,
             fn($prefix) => str_starts_with($path, $prefix)
         );
 
