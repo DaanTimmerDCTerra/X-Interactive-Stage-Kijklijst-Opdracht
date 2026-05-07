@@ -12,12 +12,21 @@ class JwtService
     public function generate(int $userId, string $email): string
     {
         $payload = [
+            'typ'   => 'access',
             'sub'   => $userId,
             'email' => $email,
             'iat'   => time(),
             'exp'   => time() + (60 * 60 * 24 * 7),
         ];
 
+        return JWT::encode($payload, $this->secret, 'HS256');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function encodePayload(array $payload): string
+    {
         return JWT::encode($payload, $this->secret, 'HS256');
     }
 
