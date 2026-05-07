@@ -7,15 +7,18 @@ use App\Repository\GenreRepository;
 use App\Repository\TitleRepository;
 use App\Service\AuthService;
 use App\Service\DataService;
+use App\Service\FileUploadService;
 use App\Service\SerializerService;
 use App\Service\TitleService;
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use InvalidArgumentException;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/api/titles')]
-class TitleController extends AbstractController
+class TitleController extends ApiController
 {
     public function __construct(
         private TitleRepository $titleRepository,
@@ -23,15 +26,20 @@ class TitleController extends AbstractController
         private DataService $dataService,
         private AuthService $authService,
         private TitleService $titleService,
+        private FileUploadService $fileUploadService,
         private SerializerService $serializer,
     ) {}
-
 
     #[Route('', methods: ['GET'])]
     public function index(Request $request): JsonResponse
     {
-        $user = $this->authService->getAuthenticatedUser($request);
-        $titles = $this->dataService->findBy(Title::class, ['user' => $user]);
+        $user = $this->authService->requireAuthenticatedUser($request);
+
+        $search = $request->query->get('search');
+        $type = $request->query->get('type');
+        $watched = $request->query->get('watched');
+
+        $titles = $this->titleRepository->findByUserWithFilters($user, $search, $type, $watched);
 
         return $this->json(array_map(
             fn(Title $title) => $this->serializer->serializeTitle($title, $user),
@@ -39,67 +47,19 @@ class TitleController extends AbstractController
         ));
     }
 
-    #[Route('/discovery', methods: ['GET'])]
-    public function discovery(Request $request): JsonResponse
-    {
-        $user = $this->authService->getAuthenticatedUser($request);
-        $allTitles = $this->dataService->findAll(Title::class, ['name' => 'ASC', 'id' => 'ASC']);
-        $userTitles = $this->dataService->findBy(Title::class, ['user' => $user]);
-
-        $userTitleKeys = array_fill_keys(
-            array_map(fn(Title $title) => $this->titleService->getTitleKey($title), $userTitles),
-            true
-        );
-
-        $grouped = [];
-        foreach ($allTitles as $title) {
-            $key = $this->titleService->getTitleKey($title);
-            if (!isset($grouped[$key])) {
-                $grouped[$key] = [
-                    'representative' => $title,
-                    'instances' => [],
-                    'publicInstances' => [],
-                ];
-            }
-            $grouped[$key]['instances'][] = $title;
-            if ($title->isPublic()) {
-                $grouped[$key]['publicInstances'][] = $title;
-                if (!$grouped[$key]['representative']->isPublic()) {
-                    $grouped[$key]['representative'] = $title;
-                }
-            }
-        }
-
-        $result = [];
-        foreach ($grouped as $key => $data) {
-            if (count($data['publicInstances']) === 0) {
-                continue;
-            }
-
-            $representative = $data['representative'];
-            $stats = $this->titleService->aggregateCommentStats($data['instances']);
-
-            $result[] = array_merge(
-                $this->serializer->serializeTitle($representative, $user, $stats),
-                [
-                    'instanceCount' => count($data['instances']),
-                    'alreadyAdded' => isset($userTitleKeys[$key])
-                ]
-            );
-        }
-
-        return $this->json($result);
-    }
-
     #[Route('/{id}', methods: ['GET'])]
     public function show(Title $title, Request $request): JsonResponse
     {
-        $user = $this->authService->getAuthenticatedUser($request);
+        $user = $this->authService->requireAuthenticatedUser($request);
+
+        if ($title->getUser() !== $user) {
+            return $this->json(['error' => 'Niet gevonden'], 404);
+        }
+
         $matchingTitles = $this->titleService->getMatchingTitles($title);
-        $stats = $this->titleService->aggregateCommentStats($matchingTitles);
 
         return $this->json(array_merge(
-            $this->serializer->serializeTitle($title, $user, $stats),
+            $this->serializer->serializeTitle($title, $user),
             [
                 'instanceCount' => count($matchingTitles),
             ]
@@ -109,62 +69,76 @@ class TitleController extends AbstractController
     #[Route('', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
-        $user = $this->authService->getAuthenticatedUser($request);
-        $contentType = $request->getContentTypeFormat();
-        if ($contentType === 'form') {
-            $body = $request->request->all();
-            if (!isset($body['genres'])) {
-                $body['genres'] = [];
-            }
-        } else {
-            $body = json_decode($request->getContent(), true) ?? [];
+        $user = $this->authService->requireAuthenticatedUser($request);
+
+        $body = $this->requestBody($request);
+        if ($body instanceof JsonResponse) {
+            return $body;
         }
 
-        if (empty($body['name'])) {
-            return $this->json(['error' => 'Naam is verplicht'], 400);
+        $name = $this->titleService->normalizeName($body['name'] ?? null);
+        if ($name === null) {
+            return $this->badRequest('Naam is verplicht');
         }
 
-        if (!in_array($body['type'] ?? '', ['film', 'serie'])) {
-            return $this->json(['error' => 'Type moet film of serie zijn'], 400);
+        $type = $this->titleService->normalizeType($body['type'] ?? null);
+        if ($type === null) {
+            return $this->badRequest('Type moet film of serie zijn');
         }
 
-        if (isset($body['year']) && !is_numeric($body['year'])) {
-            return $this->json(['error' => 'Jaartal moet een getal zijn'], 400);
+        if (!array_key_exists('year', $body) || $body['year'] === null || $body['year'] === '') {
+            return $this->badRequest('Jaartal is verplicht');
         }
 
+        if (!$this->titleService->isValidYear($body['year'])) {
+            return $this->badRequest('Voer een geldig jaartal in');
+        }
+
+        $genreIds = $this->titleService->normalizeGenreIds($body['genres'] ?? []);
+        if ($genreIds === null) {
+            return $this->badRequest('Genres moeten geldige ids zijn');
+        }
+
+        if (count($genreIds) === 0) {
+            return $this->badRequest('Kies minimaal één genre');
+        }
+
+        $body['name'] = $name;
+        $body['type'] = $type;
+        $body['year'] = $this->titleService->normalizeYear($body['year']);
+
+        $titleKey = $this->titleService->getTitleKeyFromData($body);
         $existingTitles = $this->dataService->findBy(Title::class, ['user' => $user]);
+
         foreach ($existingTitles as $existing) {
-            if ($this->titleService->getTitleKey($existing) === $this->titleService->getTitleKey($this->titleService->createTitleFromData($body))) {
-                return $this->json(['error' => 'Dit item zit al in je collectie'], 400);
+            if ($this->titleService->getTitleKey($existing) === $titleKey) {
+                return $this->badRequest('Dit item zit al in je collectie');
             }
         }
 
         $title = new Title();
-        $title->setName($body['name']);
-        $title->setType($body['type']);
-        $title->setYear(isset($body['year']) && $body['year'] ? (int)$body['year'] : null);
-        $title->setWatched((bool)(isset($body['watched']) ? $body['watched'] : false));
-        $title->setPublic((bool)(isset($body['public']) ? $body['public'] : false));
-        $title->setFavorite((bool)(isset($body['favorite']) ? $body['favorite'] : false));
+        $title->setName($name);
+        $title->setType($type);
+        $title->setYear($body['year']);
+        $title->setWatched($this->titleService->normalizeBoolean($body['watched'] ?? false));
+        $title->setFavorite($this->titleService->normalizeBoolean($body['favorite'] ?? false));
         $title->setUser($user);
 
-        foreach ($body['genres'] ?? [] as $genreId) {
+        foreach ($genreIds as $genreId) {
             $genre = $this->genreRepository->find($genreId);
+
             if ($genre) {
                 $title->addGenre($genre);
             }
         }
 
-        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/titles';
-        if (!is_dir($uploadsDir)) {
-            @mkdir($uploadsDir, 0755, true);
+        if (count($title->getGenres()) === 0) {
+            return $this->badRequest('Kies minimaal één bestaand genre');
         }
 
-        $thumbFile = $request->files->get('thumbnail');
-        if ($thumbFile) {
-            $thumbName = $this->titleService->buildUploadFilename($thumbFile, 'thumb_');
-            $thumbFile->move($uploadsDir, $thumbName);
-            $title->setThumbnail($thumbName);
+        $uploadError = $this->applyThumbnailChanges($title, $request, $body);
+        if ($uploadError) {
+            return $uploadError;
         }
 
         $this->dataService->persistAndFlush($title);
@@ -175,78 +149,88 @@ class TitleController extends AbstractController
     #[Route('/{id}', methods: ['PATCH'])]
     public function update(Title $title, Request $request): JsonResponse
     {
-        $user = $this->authService->getAuthenticatedUser($request);
+        $user = $this->authService->requireAuthenticatedUser($request);
 
         if ($title->getUser() !== $user) {
             return $this->json(['error' => 'Niet gevonden'], 404);
         }
 
-        $contentType = $request->getContentTypeFormat();
-        if ($contentType === 'form') {
-            $body = $request->request->all();
-            if (!isset($body['genres'])) {
-                $body['genres'] = [];
-            }
-        } else {
-            $body = json_decode($request->getContent(), true) ?? [];
+        $body = $this->requestBody($request);
+        if ($body instanceof JsonResponse) {
+            return $body;
         }
 
-        if (isset($body['name'])) {
-            if (empty($body['name'])) {
-                return $this->json(['error' => 'Naam mag niet leeg zijn'], 400);
+        if (array_key_exists('name', $body)) {
+            $name = $this->titleService->normalizeName($body['name']);
+
+            if ($name === null) {
+                return $this->badRequest('Naam is verplicht');
             }
-            $title->setName($body['name']);
+
+            $title->setName($name);
         }
 
-        if (isset($body['type'])) {
-            if (!in_array($body['type'], ['film', 'serie'])) {
-                return $this->json(['error' => 'Type moet film of serie zijn'], 400);
+        if (array_key_exists('type', $body)) {
+            $type = $this->titleService->normalizeType($body['type']);
+
+            if ($type === null) {
+                return $this->badRequest('Type moet film of serie zijn');
             }
-            $title->setType($body['type']);
+
+            $title->setType($type);
         }
 
         if (array_key_exists('year', $body)) {
-            $title->setYear($body['year'] ? (int)$body['year'] : null);
+            if ($body['year'] === null || $body['year'] === '') {
+                return $this->badRequest('Jaartal is verplicht');
+            }
+
+            if (!$this->titleService->isValidYear($body['year'])) {
+                return $this->badRequest('Voer een geldig jaartal in');
+            }
+
+            $title->setYear($this->titleService->normalizeYear($body['year']));
         }
 
-        if (isset($body['watched'])) {
-            $title->setWatched($body['watched'] === '1' || $body['watched'] === 1 || $body['watched'] === true);
+        if (array_key_exists('watched', $body)) {
+            $title->setWatched($this->titleService->normalizeBoolean($body['watched']));
         }
 
-        if (array_key_exists('rating', $body)) {
-            $title->setRating($body['rating'] ? (int)$body['rating'] : null);
+        if (array_key_exists('favorite', $body)) {
+            $title->setFavorite($this->titleService->normalizeBoolean($body['favorite']));
         }
-
-        if (isset($body['public'])) {
-            $title->setPublic($body['public'] === '1' || $body['public'] === 1 || $body['public'] === true);
-        }
-
-        if (isset($body['favorite'])) {
-            $title->setFavorite($body['favorite'] === '1' || $body['favorite'] === 1 || $body['favorite'] === true);
-        }
-
+    
         if (array_key_exists('genres', $body)) {
+            $genreIds = $this->titleService->normalizeGenreIds($body['genres']);
+
+            if ($genreIds === null) {
+                return $this->badRequest('Genres moeten geldige ids zijn');
+            }
+
+            if (count($genreIds) === 0) {
+                return $this->badRequest(json_encode($body));
+            }
+
             foreach ($title->getGenres() as $genre) {
                 $title->removeGenre($genre);
             }
-            foreach ($body['genres'] as $genreId) {
+
+            foreach ($genreIds as $genreId) {
                 $genre = $this->genreRepository->find($genreId);
+
                 if ($genre) {
                     $title->addGenre($genre);
                 }
             }
+
+            if (count($title->getGenres()) === 0) {
+                return $this->badRequest('Kies minimaal één bestaand genre');
+            }
         }
 
-        $uploadsDir = $this->getParameter('kernel.project_dir') . '/public/uploads/titles';
-        if (!is_dir($uploadsDir)) {
-            @mkdir($uploadsDir, 0755, true);
-        }
-
-        $thumbFile = $request->files->get('thumbnail');
-        if ($thumbFile) {
-            $thumbName = $this->titleService->buildUploadFilename($thumbFile, 'thumb_');
-            $thumbFile->move($uploadsDir, $thumbName);
-            $title->setThumbnail($thumbName);
+        $uploadError = $this->applyThumbnailChanges($title, $request, $body);
+        if ($uploadError) {
+            return $uploadError;
         }
 
         $this->dataService->flush();
@@ -257,14 +241,59 @@ class TitleController extends AbstractController
     #[Route('/{id}', methods: ['DELETE'])]
     public function delete(Title $title, Request $request): JsonResponse
     {
-        $user = $this->authService->getAuthenticatedUser($request);
+        $user = $this->authService->requireAuthenticatedUser($request);
 
         if ($title->getUser() !== $user) {
             return $this->json(['error' => 'Niet gevonden'], 404);
         }
 
+        if ($title->getThumbnail()) {
+            try {
+                $this->fileUploadService->deleteTitleThumbnail($title->getThumbnail());
+            } catch (RuntimeException) {
+                return $this->json(['error' => 'Thumbnail kon niet worden verwijderd.'], 500);
+            }
+        }
+
         $this->dataService->removeAndFlush($title);
 
         return $this->json(null, 204);
+    }
+
+    private function applyThumbnailChanges(Title $title, Request $request, array $body): ?JsonResponse
+    {
+        $removeThumbnail = $this->titleService->normalizeBoolean($body['removeThumbnail'] ?? false);
+        $thumbFile = $request->files->get('thumbnail');
+
+        if ($removeThumbnail && $title->getThumbnail()) {
+            try {
+                $this->fileUploadService->deleteTitleThumbnail($title->getThumbnail());
+                $title->setThumbnail(null);
+            } catch (RuntimeException) {
+                return $this->json(['error' => 'Thumbnail kon niet worden verwijderd.'], 500);
+            }
+        }
+
+        if ($thumbFile === null) {
+            return null;
+        }
+
+        if (!$thumbFile instanceof UploadedFile) {
+            return $this->badRequest('Ongeldige thumbnail upload.');
+        }
+
+        try {
+            if ($title->getThumbnail()) {
+                $this->fileUploadService->deleteTitleThumbnail($title->getThumbnail());
+            }
+
+            $title->setThumbnail($this->fileUploadService->uploadTitleThumbnail($thumbFile));
+        } catch (InvalidArgumentException $exception) {
+            return $this->badRequest($exception->getMessage());
+        } catch (RuntimeException) {
+            return $this->json(['error' => 'Thumbnail kon niet worden opgeslagen.'], 500);
+        }
+
+        return null;
     }
 }
