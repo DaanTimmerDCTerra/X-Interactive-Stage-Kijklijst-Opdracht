@@ -11,6 +11,10 @@ services:
     App\Service\JwtService:
         arguments:
             $secret: '%env(JWT_SECRET)%'
+
+    App\Service\FileUploadService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
     
     App\EventListener\JwtAuthListener:
         tags:
