@@ -1,222 +1,216 @@
-import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { API } from '../lib/constants'
-import VectorIcon from '../components/VectorIcon'
-import { assetBase } from '../lib/constants'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { getImageUrl } from '../lib/constants'
+import TitlePreviewCard from '../components/TitlePreviewCard'
+import { requestAuthApi } from '../lib/api'
+
+const FILTER = {
+    all: 'alle',
+    watched: 'gezien',
+    notWatched: 'niet-gezien',
+    film: 'film',
+    serie: 'serie',
+    favorites: 'favorieten',
+    notFavorites: 'geen-favorieten',
+}
+
+function parseUrlParams(search) {
+    const params = new URLSearchParams(search)
+
+    const searchValue = params.get('search') ?? ''
+    const genre = params.get('genre') ?? FILTER.all
+
+    const presetParam = params.get('preset')
+    let preset = FILTER.all
+
+    if (presetParam && Object.values(FILTER).includes(presetParam)) {
+        preset = presetParam
+    } else if (params.get('favorite') === 'true') {
+        preset = FILTER.favorites
+    } else if (params.get('watched') === 'watched') {
+        preset = FILTER.watched
+    } else if (params.get('watched') === 'unwatched') {
+        preset = FILTER.notWatched
+    } else if (params.get('type') === 'film') {
+        preset = FILTER.film
+    } else if (params.get('type') === 'serie') {
+        preset = FILTER.serie
+    }
+
+    return { search: searchValue, preset, genre }
+}
 
 export default function ListPage({ token }) {
-    const [titles, setTitles] = useState([])
-    const [search, setSearch] = useState('')
-    const [filterType, setFilterType] = useState('alle')
-    const [filterWatched, setFilterWatched] = useState('alle')
     const navigate = useNavigate()
+    const location = useLocation()
+    const filters = useMemo(() => parseUrlParams(location.search), [location.search])
 
-    const fetchTitles = useCallback(() => {
-        fetch(`${API}/titles`, {
-            headers: { Authorization: `Bearer ${token}` }
-        })
-            .then((r) => r.json())
-            .then(setTitles)
-    }, [token])
+    const [titles, setTitles] = useState([])
 
     useEffect(() => {
-        fetchTitles()
-    }, [fetchTitles])
+        let active = true
+        const controller = new AbortController()
+
+        const loadTitles = async () => {
+            const params = new URLSearchParams()
+            if (filters.search.trim()) params.set('search', filters.search.trim())
+
+            try {
+                const data = await requestAuthApi(token, `/titles${params.toString() ? `?${params.toString()}` : ''}`, {
+                    signal: controller.signal,
+                })
+                if (active) setTitles(data ?? [])
+            } catch (error) {
+                if (error instanceof DOMException && error.name === 'AbortError') return
+                if (active) setTitles([])
+            }
+        }
+
+        loadTitles()
+        return () => {
+            active = false
+            controller.abort()
+        }
+    }, [token, filters.search])
+
+    const pushUrl = useCallback((newSearch, newPreset, newGenre) => {
+        const params = new URLSearchParams()
+        if (newSearch.trim()) params.set('search', newSearch.trim())
+        if (newPreset !== FILTER.all) params.set('preset', newPreset)
+        if (newGenre !== FILTER.all) params.set('genre', newGenre)
+        navigate(`?${params.toString()}`, { replace: true })
+    }, [navigate])
+
+    const handleSearchChange = (value) => {
+        pushUrl(value, filters.preset, filters.genre)
+    }
+
+    const handlePresetChange = (value) => {
+        pushUrl(filters.search, value, filters.genre)
+    }
+
+    const handleGenreChange = (value) => {
+        pushUrl(filters.search, filters.preset, value)
+    }
 
     const deleteTitle = (id) =>
-        fetch(`${API}/titles/${id}`, {
+        requestAuthApi(token, `/titles/${id}`, {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` }
-        }).then(fetchTitles)
+        }).then(() => {
+            setTitles((currentTitles) => currentTitles.filter((title) => title.id !== id))
+        })
 
     const toggleWatched = (title) =>
-        fetch(`${API}/titles/${title.id}`, {
+        requestAuthApi(token, `/titles/${title.id}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({ watched: !title.watched })
-        }).then(fetchTitles)
+        }).then(() => {
+            setTitles((currentTitles) => currentTitles.map((currentTitle) => (
+                currentTitle.id === title.id
+                    ? { ...currentTitle, watched: !currentTitle.watched }
+                    : currentTitle
+            )))
+        })
 
     const toggleFavorite = (title) =>
-        fetch(`${API}/titles/${title.id}`, {
+        requestAuthApi(token, `/titles/${title.id}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`
             },
             body: JSON.stringify({ favorite: !title.favorite })
-        }).then(fetchTitles)
+        }).then(() => {
+            setTitles((currentTitles) => currentTitles.map((currentTitle) => (
+                currentTitle.id === title.id
+                    ? { ...currentTitle, favorite: !currentTitle.favorite }
+                    : currentTitle
+            )))
+        })
 
-    const filtered = titles
-        .filter((title) => filterType === 'alle' || title.type === filterType)
-        .filter((title) => filterWatched === 'alle' || (filterWatched === 'gezien' ? title.watched : !title.watched))
-        .filter((title) => title.name.toLowerCase().includes(search.toLowerCase()))
+    const genres = titles
+        .flatMap((title) => title.genres ?? [])
+        .filter((genre, index, currentGenres) => currentGenres.findIndex((entry) => entry.id === genre.id) === index)
+        .sort((left, right) => left.name.localeCompare(right.name))
 
-    const favoriteTitles = filtered.filter((title) => title.favorite)
+    const sortedTitles = [...titles].sort((left, right) => {
+        if (left.favorite !== right.favorite) return left.favorite ? -1 : 1
+        return left.name.localeCompare(right.name)
+    })
+
+    let filteredTitles = [...sortedTitles]
+
+    if (filters.preset === FILTER.film) filteredTitles = filteredTitles.filter((title) => title.type === 'film')
+    if (filters.preset === FILTER.serie) filteredTitles = filteredTitles.filter((title) => title.type === 'serie')
+    if (filters.preset === FILTER.watched) filteredTitles = filteredTitles.filter((title) => title.watched)
+    if (filters.preset === FILTER.notWatched) filteredTitles = filteredTitles.filter((title) => !title.watched)
+    if (filters.preset === FILTER.favorites) filteredTitles = filteredTitles.filter((title) => title.favorite)
+    if (filters.preset === FILTER.notFavorites) filteredTitles = filteredTitles.filter((title) => !title.favorite)
+
+    filteredTitles = filteredTitles.filter((title) => {
+        if (filters.genre === FILTER.all) return true
+        return (title.genres ?? []).some((genre) => String(genre.id) === filters.genre)
+    })
 
     return (
-        <div className="w-full">
-            <div className="mb-10">
-                <h1 className="text-4xl font-bold mb-3">Mijn lijst</h1>
-                <p className="max-w-3xl text-zinc-400 text-sm leading-6">
-                    Dit is jouw persoonlijke verzameling. Je kunt hier filteren, favorieten markeren en direct naar de detailpagina gaan.
-                </p>
+        <div className="full-width">
+            <div className="page-header">
+                <h1 className="page-title">Mijn lijst</h1>
             </div>
 
-            <div className="flex flex-col gap-3 lg:flex-row mb-6">
+            <div className="filters-row">
                 <input
                     type="text"
-                    placeholder="Zoeken in mijn lijst..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="flex-1 bg-zinc-900 text-white px-4 py-3 text-sm placeholder-zinc-600 focus:outline-none focus:bg-zinc-800 transition"
+                    placeholder="Zoek een film of serie..."
+                    value={filters.search}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="filter-control"
                 />
                 <select
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="bg-zinc-900 text-white px-4 py-3 text-sm focus:outline-none"
+                    value={filters.preset}
+                    onChange={(e) => handlePresetChange(e.target.value)}
+                    className="filter-control"
                 >
-                    <option value="alle">Alle types</option>
-                    <option value="film">Films</option>
-                    <option value="serie">Series</option>
+                    <option value={FILTER.all}>Alle filters</option>
+                    <option value={FILTER.film}>Films</option>
+                    <option value={FILTER.serie}>Series</option>
+                    <option value={FILTER.watched}>Gezien</option>
+                    <option value={FILTER.notWatched}>Niet gezien</option>
+                    <option value={FILTER.favorites}>Favorieten</option>
+                    <option value={FILTER.notFavorites}>Geen favorieten</option>
                 </select>
                 <select
-                    value={filterWatched}
-                    onChange={(e) => setFilterWatched(e.target.value)}
-                    className="bg-zinc-900 text-white px-4 py-3 text-sm focus:outline-none"
+                    value={filters.genre}
+                    onChange={(e) => handleGenreChange(e.target.value)}
+                    className="filter-control"
                 >
-                    <option value="alle">Alles</option>
-                    <option value="gezien">Gezien</option>
-                    <option value="niet-gezien">Niet gezien</option>
+                    <option value={FILTER.all}>Alle genres</option>
+                    {genres.map((genre) => (
+                        <option key={genre.id} value={String(genre.id)}>
+                            {genre.name}
+                        </option>
+                    ))}
                 </select>
             </div>
 
-            <p className="text-zinc-500 text-sm mb-5">
-                {filtered.length} {filtered.length === 1 ? 'titel' : 'titels'}
-            </p>
-
-            {favoriteTitles.length > 0 && (
-                <section className="mb-10">
-                    <h2 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest mb-4">
-                        Favorieten ({favoriteTitles.length})
-                    </h2>
-                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {favoriteTitles.map((title) => (
-                            <button
-                                key={title.id}
-                                type="button"
-                                onClick={() => navigate(`/titel/${title.id}`)}
-                                className="card text-left"
-                            >
-                                {title.thumbnail && (
-                                    <div className="mb-3 overflow-hidden ui-rounded bg-zinc-800 aspect-video">
-                                        <img src={`${API.replace('/api', '')}${title.thumbnail}`} alt={title.name} className="h-full w-full object-cover" />
-                                    </div>
-                                )}
-                                <p className="card-title">{title.name}</p>
-                                <p className="card-meta">{title.type} {title.year ? `· ${title.year}` : ''}</p>
-                                <div className="rating mt-3">
-                                    {[1, 2, 3, 4, 5].map((score) => (
-                                        <span key={score} className={`rating-star ${score <= (title.averageRating ?? 0) ? 'active' : 'inactive'}`}>★</span>
-                                    ))}
-                                    <span className="text-xs text-zinc-500 ml-2">({title.commentCount ?? 0})</span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </section>
-            )}
-
-            {filtered.length === 0 ? (
-                <div className="bg-zinc-900 p-10 text-center text-zinc-600 text-sm ui-rounded">
-                    Geen titels gevonden.
+            {filteredTitles.length === 0 ? (
+                <div className="panel-empty">
+                    Geen films of series gevonden voor dit filter.
                 </div>
             ) : (
-                <div className="overflow-x-auto bg-zinc-900 ui-rounded border border-zinc-800">
-                    <table className="w-full min-w-[900px]">
-                        <thead>
-                            <tr className="border-b border-zinc-800 text-zinc-500 text-xs font-semibold">
-                                <th className="text-left px-5 py-4">Favoriet</th>
-                                <th className="text-left px-5 py-4">Naam</th>
-                                <th className="text-left px-5 py-4">Type</th>
-                                <th className="text-left px-5 py-4">Jaar</th>
-                                <th className="text-left px-5 py-4">Genres</th>
-                                <th className="text-left px-5 py-4">Beoordeling</th>
-                                <th className="text-left px-5 py-4">Gezien</th>
-                                <th className="px-5 py-4"></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((title) => (
-                                <tr
-                                    key={title.id}
-                                    className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800 transition group cursor-pointer"
-                                    onClick={() => navigate(`/titel/${title.id}`)}
-                                >
-                                    <td className="px-5 py-4">
-                                        <button
-                                            onClick={(event) => { event.stopPropagation(); toggleFavorite(title) }}
-                                            className="transition"
-                                            type="button"
-                                        >
-                                            <VectorIcon
-                                                src={title.favorite ? `${assetBase}/Star.png` : `${assetBase}/Star v2.png`}
-                                                alt={title.favorite ? 'Favoriet' : 'Niet favoriet'}
-                                                className={`aspect-square h-5 w-5 object-contain ${title.favorite ? '' : 'opacity-55'}`}
-                                            />
-                                        </button>
-                                    </td>
-                                    <td className="px-5 py-4 text-sm font-semibold">{title.name}</td>
-                                    <td className="px-5 py-4 text-xs text-zinc-400 capitalize">{title.type}</td>
-                                    <td className="px-5 py-4 text-sm text-zinc-500">{title.year ?? '—'}</td>
-                                    <td className="px-5 py-4">
-                                        <div className="flex gap-1 flex-wrap">
-                                            {title.genres.map((genre) => (
-                                                <span key={genre.id} className="text-xs bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded-full">
-                                                    {genre.name}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex">
-                                                {[1, 2, 3, 4, 5].map((score) => (
-                                                    <span key={score} className={`text-sm ${score <= (title.averageRating ?? 0) ? 'text-yellow-400' : 'text-zinc-700'}`}>★</span>
-                                                ))}
-                                            </div>
-                                            <span className="text-xs text-zinc-500">({title.commentCount ?? 0})</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-5 py-4">
-                                        <button
-                                            onClick={(event) => { event.stopPropagation(); toggleWatched(title) }}
-                                            className="transition"
-                                            type="button"
-                                        >
-                                            <VectorIcon
-                                                src={title.watched ? `${assetBase}/Checkmark.png` : `${assetBase}/Eye.png`}
-                                                alt={title.watched ? 'Gezien' : 'Niet gezien'}
-                                                className={`aspect-square h-5 w-5 object-contain ${title.watched ? '' : 'opacity-55'}`}
-                                            />
-                                        </button>
-                                    </td>
-                                    <td className="px-5 py-4 text-right opacity-0 group-hover:opacity-100 transition">
-                                        <button
-                                            onClick={(event) => { event.stopPropagation(); deleteTitle(title.id) }}
-                                            className="inline-flex items-center gap-2 text-xs text-zinc-600 hover:text-red-400 transition"
-                                            type="button"
-                                        >
-                                            <VectorIcon src={`${assetBase}/Trash Bin.png`} alt="" className="aspect-square h-4 w-4 object-contain" />
-                                            Verwijderen
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                <div className="titles-grid">
+                    {filteredTitles.map((title) => (
+                        <TitlePreviewCard
+                            key={title.id}
+                            title={{ ...title, imageUrl: getImageUrl(title.thumbnail) }}
+                            onClick={() => navigate(`/titel/${title.id}`)}
+                            onToggleFavorite={toggleFavorite}
+                            onToggleWatched={toggleWatched}
+                            onDelete={deleteTitle}
+                        />
+                    ))}
                 </div>
             )}
         </div>
