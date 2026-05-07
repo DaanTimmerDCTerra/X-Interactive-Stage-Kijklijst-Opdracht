@@ -3,20 +3,34 @@
 namespace App\Service;
 
 use App\Entity\Title;
-use App\Entity\User;
-use App\Repository\CommentRepository;
 use App\Repository\TitleRepository;
 
 class TitleService
 {
+    private const MAX_TITLE_NAME_LENGTH = 255;
+    private const MIN_TITLE_YEAR = 1888;
+    private const ALLOWED_TYPES = ['film', 'serie'];
+
     public function __construct(
         private TitleRepository $titleRepository,
-        private CommentRepository $commentRepository,
     ) {}
 
     public function getTitleKey(Title $title): string
     {
-        return mb_strtolower(trim((string)$title->getName())) . '|' . (string)$title->getType() . '|' . (string)$title->getYear();
+        return $this->buildTitleKey(
+            (string) $title->getName(),
+            (string) $title->getType(),
+            $title->getYear()
+        );
+    }
+
+    public function getTitleKeyFromData(array $data): string
+    {
+        return $this->buildTitleKey(
+            (string) ($data['name'] ?? ''),
+            (string) ($data['type'] ?? ''),
+            $this->normalizeYear($data['year'] ?? null)
+        );
     }
 
     public function getMatchingTitles(Title $title): array
@@ -28,43 +42,83 @@ class TitleService
         ));
     }
 
-    public function aggregateCommentStats(array $titles): array
+    public function normalizeYear(mixed $year): ?int
     {
-        $commentCount = 0;
-        $ratingCount = 0;
-        $ratingTotal = 0;
-
-        foreach ($titles as $title) {
-            $comments = $this->commentRepository->findBy(['title' => $title]);
-            foreach ($comments as $comment) {
-                $commentCount++;
-                if ($comment->getRating() !== null) {
-                    $ratingCount++;
-                    $ratingTotal += $comment->getRating();
-                }
-            }
+        if ($year === null || $year === '') {
+            return null;
         }
 
-        return [
-            'commentCount' => $commentCount,
-            'ratingCount' => $ratingCount,
-            'averageRating' => $ratingCount > 0 ? round($ratingTotal / $ratingCount, 1) : null,
-        ];
+        return (int) $year;
     }
 
-    public function createTitleFromData(array $data): Title
+    public function normalizeName(mixed $name): ?string
     {
-        $title = new Title();
-        $title->setName($data['name'] ?? '');
-        $title->setType($data['type'] ?? '');
-        $title->setYear(isset($data['year']) ? (int)$data['year'] : null);
-        return $title;
+        if (!is_string($name)) {
+            return null;
+        }
+
+        $name = trim($name);
+
+        if ($name === '' || mb_strlen($name) > self::MAX_TITLE_NAME_LENGTH) {
+            return null;
+        }
+
+        return $name;
     }
 
-    public function buildUploadFilename(object $file, string $prefix): string
+    public function normalizeType(mixed $type): ?string
     {
-        $extension = method_exists($file, 'getClientOriginalExtension') ? trim((string)$file->getClientOriginalExtension()) : '';
-        $extension = preg_replace('/[^a-zA-Z0-9]/', '', $extension) ?: 'bin';
-        return uniqid($prefix) . '.' . $extension;
+        return is_string($type) && in_array($type, self::ALLOWED_TYPES, true) ? $type : null;
+    }
+
+    public function isValidYear(mixed $year): bool
+    {
+        if ($year === null || $year === '') {
+            return true;
+        }
+
+        if (!is_numeric($year)) {
+            return false;
+        }
+
+        $year = (int) $year;
+
+        return $year >= self::MIN_TITLE_YEAR && $year <= (int) date('Y');
+    }
+
+    public function normalizeBoolean(mixed $value): bool
+    {
+        return $value === true || $value === 1 || $value === '1';
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    public function normalizeGenreIds(mixed $genreIds): ?array
+    {
+        if ($genreIds === null) {
+            return [];
+        }
+
+        if (!is_array($genreIds)) {
+            return null;
+        }
+
+        $normalized = [];
+
+        foreach ($genreIds as $genreId) {
+            if (!is_numeric($genreId) || (int) $genreId < 1) {
+                return null;
+            }
+
+            $normalized[] = (int) $genreId;
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    private function buildTitleKey(string $name, string $type, ?int $year): string
+    {
+        return mb_strtolower(trim($name)) . '|' . $type . '|' . (string) $year;
     }
 }
