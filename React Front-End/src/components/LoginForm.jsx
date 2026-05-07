@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { requestApi } from '../lib/api'
 
-export default function LoginForm({ apiUrl, onLogin, onGoToSignup }) {
+export default function LoginForm({ onLogin, onGoToSignup }) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState(null)
@@ -10,22 +11,15 @@ export default function LoginForm({ apiUrl, onLogin, onGoToSignup }) {
         setError(null)
 
         try {
-            const res = await fetch(`${apiUrl}/login`, {
+            const data = await requestApi('/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             })
 
-            const data = await res.json().catch(() => null)
-
-            if (!res.ok) {
-                setError(data?.error || 'Inloggen mislukt')
-                return
-            }
-
-            onLogin(data.token, email)
-        } catch {
-            setError('Kan geen verbinding maken met de server')
+            onLogin(data.token, data.user?.email ?? email, data.user?.profilePicture ?? null)
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Kan geen verbinding maken met de server')
         }
     }
 
@@ -63,7 +57,7 @@ export default function LoginForm({ apiUrl, onLogin, onGoToSignup }) {
                         Inloggen
                     </button>
                 </form>
-                <p className="text-zinc-600 text-sm mt-4 text-center">
+                <p className="auth-note">
                     Nog geen account?{' '}
                     <button
                         onClick={onGoToSignup}

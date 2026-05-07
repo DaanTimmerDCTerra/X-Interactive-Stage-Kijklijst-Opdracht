@@ -1,61 +1,31 @@
 import { useState } from 'react'
+import { requestApi } from '../lib/api'
 
-export default function SignupForm({ apiUrl, onGoToLogin, onSignup }) {
+export default function SignupForm({ onGoToLogin, onSignup }) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [error, setError] = useState(null)
-    const [success, setSuccess] = useState(false)
 
-    const handleSubmit = async (e) => {
-        e.preventDefault()
+    const handleSubmit = async (event) => {
+        event.preventDefault()
         setError(null)
 
-        if (password.length < 6) {
-            setError('Wachtwoord moet minimaal 6 tekens zijn')
+        if (password.length < 8) {
+            setError('Wachtwoord moet minimaal 8 tekens zijn')
             return
         }
 
         try {
-            const res = await fetch(`${apiUrl}/register`, {
+            const data = await requestApi('/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
             })
 
-            const data = await res.json().catch(() => null)
-
-            if (!res.ok) {
-                setError(data?.error || 'Registreren mislukt')
-                return
-            }
-
-            if (data?.token) {
-                onSignup?.(data.token, email)
-                return
-            }
-
-            setSuccess(true)
-        } catch {
-            setError('Kan geen verbinding maken met de server')
+            onSignup?.(data.token, data.user?.email ?? email, data.user?.profilePicture ?? null)
+        } catch (error) {
+            setError(error instanceof Error ? error.message : 'Kan geen verbinding maken met de server')
         }
-    }
-
-    if (success) {
-        return (
-            <div className="auth-screen">
-                <div className="auth-card auth-card-center">
-                    <p className="auth-success-icon">✅</p>
-                    <h2 className="auth-title text-xl mb-2">Account aangemaakt</h2>
-                    <p className="auth-subtitle mb-6">Je bent direct ingelogd en kunt meteen verder.</p>
-                    <button
-                        onClick={onGoToLogin}
-                        className="field-button"
-                    >
-                        Naar inloggen
-                    </button>
-                </div>
-            </div>
-        )
     }
 
     return (
@@ -69,7 +39,7 @@ export default function SignupForm({ apiUrl, onGoToLogin, onSignup }) {
                         <input
                             type="email"
                             value={email}
-                            onChange={e => setEmail(e.target.value)}
+                            onChange={(event) => setEmail(event.target.value)}
                             required
                             className="field-input"
                         />
@@ -79,25 +49,19 @@ export default function SignupForm({ apiUrl, onGoToLogin, onSignup }) {
                         <input
                             type="password"
                             value={password}
-                            onChange={e => setPassword(e.target.value)}
+                            onChange={(event) => setPassword(event.target.value)}
                             required
                             className="field-input"
                         />
                     </div>
                     {error && <p className="field-error">{error}</p>}
-                    <button
-                        type="submit"
-                        className="field-button"
-                    >
+                    <button type="submit" className="field-button">
                         Registreren
                     </button>
                 </form>
-                <p className="text-zinc-600 text-sm mt-4 text-center">
+                <p className="auth-note">
                     Al een account?{' '}
-                    <button
-                        onClick={onGoToLogin}
-                        className="field-link"
-                    >
+                    <button onClick={onGoToLogin} className="field-link">
                         Inloggen
                     </button>
                 </p>
