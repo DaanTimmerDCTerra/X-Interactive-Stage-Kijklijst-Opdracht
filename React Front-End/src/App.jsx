@@ -1,63 +1,62 @@
-import { useState } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import LoginForm from './components/LoginForm'
 import SignupForm from './components/SignupForm'
 import Sidebar from './components/Sidebar'
-import TopBar from './components/TopBar'
 import HomePage from './pages/HomePage'
 import ListPage from './pages/ListPage'
 import AddPage from './pages/AddPage'
-import DiscoveryPage from './pages/DiscoveryPage'
 import DetailPage from './pages/DetailPage'
+import EditPage from './pages/EditPage'
 import ProfilePage from './pages/ProfilePage'
 import SnakePage from './pages/SnakePage'
 import {
   clearCurrentSession,
-  getProfilePicture,
-  loadCurrentEmail,
-  loadAccounts,
+  loadCurrentToken,
   setCurrentSession,
 } from './lib/accountStorage'
-import { API } from './lib/constants'
-export const assetBase = '/VectorPack'
-export const getImageUrl = (path) => path ? `${API.replace('/api', '')}${path}` : null
+import { requestAuthApi } from './lib/api'
 
-function AuthScreen({ mode, onLogin, onGoToLogin, onGoToSignup }) {
-  if (mode === 'signup') {
-    return <SignupForm apiUrl={API} onSignup={onLogin} onGoToLogin={onGoToLogin} />
-  }
-
-  return <LoginForm apiUrl={API} onLogin={onLogin} onGoToSignup={onGoToSignup} />
+const authPage = {
+  login: 'login',
+  signup: 'signup',
 }
 
-function AppShell({ token, email, onLogout, onSwitchAccount, onProfileChange }) {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const profileImage = getProfilePicture(email)
-  const hideTopBar = location.pathname === '/snake'
-  const isSnakePage = location.pathname === '/snake'
-
-  const handleSwitchAccount = (newToken) => {
-    if (!newToken) return
-
-    onSwitchAccount(newToken)
-    navigate('/')
+function AuthScreen({ mode, onLogin, onGoToLogin, onGoToSignup }) {
+  if (mode === authPage.signup) {
+    return <SignupForm onSignup={onLogin} onGoToLogin={onGoToLogin} />
   }
 
+  return <LoginForm onLogin={onLogin} onGoToSignup={onGoToSignup} />
+}
+
+function AppShell({ token, email, profileImage, onLogout, onProfileChange }) {
+  const location = useLocation()
+  const isSnakePage = location.pathname === '/snake'
+
   return (
-    <div className="flex min-h-screen bg-zinc-950 text-white">
-      <Sidebar onLogout={onLogout} onSwitchAccount={handleSwitchAccount} />
-      <div className="flex-1 ml-56 min-h-screen">
-        {!hideTopBar && <TopBar email={email} profileImage={profileImage} />}
-        <main className={isSnakePage ? 'w-full p-0' : 'w-full p-6 lg:p-10'}>
+    <div className="app-root">
+      <Sidebar email={email} profileImage={profileImage} onLogout={onLogout} />
+      <div className="app-main">
+        <main className={isSnakePage ? 'main-content-full' : 'main-content'}>
           <Routes>
             <Route path="/" element={<HomePage token={token} />} />
             <Route path="/mijn-lijst" element={<ListPage token={token} />} />
             <Route path="/toevoegen" element={<AddPage token={token} />} />
-            <Route path="/discovery" element={<DiscoveryPage token={token} />} />
-            <Route path="/profiel" element={<ProfilePage email={email} onProfileChange={onProfileChange} />} />
+            <Route
+              path="/profiel"
+              element={(
+                <ProfilePage
+                  email={email}
+                  token={token}
+                  profileImage={profileImage}
+                  onProfileChange={onProfileChange}
+                />
+              )}
+            />
             <Route path="/titel/:id" element={<DetailPage token={token} />} />
-            <Route path="/snake" element={<SnakePage />} />
+            <Route path="/titel/:id/bewerk" element={<EditPage token={token} />} />
+            <Route path="/snake" element={<SnakePage token={token} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
@@ -67,34 +66,50 @@ function AppShell({ token, email, onLogout, onSwitchAccount, onProfileChange }) 
 }
 
 export default function App() {
-  const [token, setToken] = useState(localStorage.getItem('token'))
-  const [email, setEmail] = useState(() => loadCurrentEmail(localStorage.getItem('token')))
-  const [page, setPage] = useState('login')
-  const [, bumpProfileVersion] = useState(0)
+  const [token, setToken] = useState(() => loadCurrentToken())
+  const [email, setEmail] = useState('')
+  const [profileImage, setProfileImage] = useState(null)
+  const [page, setPage] = useState(authPage.login)
 
-  const login = (newToken, email) => {
-    setCurrentSession(newToken, email)
+  useEffect(() => {
+    const loadEmailFromToken = async () => {
+      if (!token) {
+        setEmail('')
+        setProfileImage(null)
+        return
+      }
+
+      try {
+        const data = await requestAuthApi(token, '/profile')
+        if (data?.email) {
+          setEmail(data.email)
+          setProfileImage(data.profilePicture ?? null)
+          setCurrentSession(token)
+        }
+      } catch (err) {
+        console.error('Failed to load email:', err)
+        clearCurrentSession()
+        setToken(null)
+        setEmail('')
+        setProfileImage(null)
+      }
+    }
+
+    loadEmailFromToken()
+  }, [token])
+
+  const login = (newToken, email, profilePicture = null) => {
+    setCurrentSession(newToken)
     setToken(newToken)
     setEmail(email)
+    setProfileImage(profilePicture)
   }
 
   const logout = () => {
     clearCurrentSession()
     setToken(null)
     setEmail('')
-  }
-
-  const switchAccount = (newToken) => {
-    if (!newToken) return
-
-    const account = loadAccounts().find((entry) => entry.token === newToken)
-    setCurrentSession(newToken, account?.email ?? '')
-    setToken(newToken)
-    setEmail(account?.email ?? '')
-  }
-
-  const refreshProfile = () => {
-    bumpProfileVersion((value) => value + 1)
+    setProfileImage(null)
   }
 
   if (!token) {
@@ -102,20 +117,20 @@ export default function App() {
       <AuthScreen
         mode={page}
         onLogin={login}
-        onGoToLogin={() => setPage('login')}
-        onGoToSignup={() => setPage('signup')}
+        onGoToLogin={() => setPage(authPage.login)}
+        onGoToSignup={() => setPage(authPage.signup)}
       />
     )
   }
 
   return (
     <BrowserRouter>
-      <AppShell
-        token={token}
-        email={email}
-        onLogout={logout}
-        onSwitchAccount={switchAccount}
-        onProfileChange={refreshProfile}
+      <AppShell 
+        token={token} 
+        email={email} 
+        profileImage={profileImage}
+        onLogout={logout} 
+        onProfileChange={setProfileImage}
       />
     </BrowserRouter>
   )
