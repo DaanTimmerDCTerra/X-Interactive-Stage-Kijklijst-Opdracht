@@ -3,8 +3,8 @@ Kijklijst-app voor films en series. Backend: Symfony, Doctrine en SQLite. Fronte
 
 ## Voorgemaakt account
 ```markdown
-**Gebruikersnaam:** `admin@gmail.com`  
-**Wachtwoord:** `admin123!`
+Gebruikersnaam: `admin@gmail.com`  
+Wachtwoord: `admin123!`
 ```
 
 ## Starten
