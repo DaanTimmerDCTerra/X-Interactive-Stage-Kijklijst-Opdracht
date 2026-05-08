@@ -9,9 +9,6 @@ use Symfony\Component\HttpFoundation\Request;
 
 abstract class ApiController extends AbstractController
 {
-    /**
-     * @return array<string, mixed>|JsonResponse
-     */
     protected function jsonBody(Request $request): array|JsonResponse
     {
         if (trim($request->getContent()) === '') {
@@ -24,16 +21,13 @@ abstract class ApiController extends AbstractController
             return $this->badRequest('Ongeldige JSON.');
         }
 
-        if (!is_array($body)) {
+        if (!is_array($body) || array_is_list($body)) {
             return $this->badRequest('JSON body moet een object zijn.');
         }
 
         return $body;
     }
 
-    /**
-     * @return array<string, mixed>|JsonResponse
-     */
     protected function requestBody(Request $request): array|JsonResponse
     {
         $isFormRequest =
@@ -90,7 +84,7 @@ abstract class ApiController extends AbstractController
         }
 
         if (!is_array($genres) || count($genres) === 0) {
-            return $this->badRequest('Kies minimaal één genre.');
+            return $this->badRequest('Kies minimaal een genre.');
         }
 
         return null;

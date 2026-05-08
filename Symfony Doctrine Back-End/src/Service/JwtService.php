@@ -22,9 +22,6 @@ class JwtService
         return JWT::encode($payload, $this->secret, 'HS256');
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     */
     public function encodePayload(array $payload): string
     {
         return JWT::encode($payload, $this->secret, 'HS256');

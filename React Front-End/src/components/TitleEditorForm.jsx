@@ -323,7 +323,7 @@ export default function TitleEditorForm({ token, titleId = null }) {
                     <input
                         id="thumbnail"
                         type="file"
-                        accept="image/*"
+                        accept="image/jpeg,image/png,image/webp"
                         onChange={handleThumbnailChange}
                         className="hidden"
                     />

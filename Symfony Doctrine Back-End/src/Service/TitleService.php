@@ -91,9 +91,6 @@ class TitleService
         return $value === true || $value === 1 || $value === '1';
     }
 
-    /**
-     * @return list<int>|null
-     */
     public function normalizeGenreIds(mixed $genreIds): ?array
     {
         if ($genreIds === null) {

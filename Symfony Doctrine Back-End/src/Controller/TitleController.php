@@ -100,7 +100,7 @@ class TitleController extends ApiController
         }
 
         if (count($genreIds) === 0) {
-            return $this->badRequest('Kies minimaal één genre');
+            return $this->badRequest('Kies minimaal een genre');
         }
 
         $body['name'] = $name;
@@ -133,7 +133,7 @@ class TitleController extends ApiController
         }
 
         if (count($title->getGenres()) === 0) {
-            return $this->badRequest('Kies minimaal één bestaand genre');
+            return $this->badRequest('Kies minimaal een bestaand genre');
         }
 
         $uploadError = $this->applyThumbnailChanges($title, $request, $body);
@@ -208,7 +208,7 @@ class TitleController extends ApiController
             }
 
             if (count($genreIds) === 0) {
-                return $this->badRequest(json_encode($body));
+                return $this->badRequest('Kies minimaal een genre');
             }
 
             foreach ($title->getGenres() as $genre) {
@@ -224,7 +224,7 @@ class TitleController extends ApiController
             }
 
             if (count($title->getGenres()) === 0) {
-                return $this->badRequest('Kies minimaal één bestaand genre');
+                return $this->badRequest('Kies minimaal een bestaand genre');
             }
         }
 

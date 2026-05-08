@@ -67,35 +67,56 @@ function AppShell({ token, email, profileImage, onLogout, onProfileChange }) {
 
 export default function App() {
   const [token, setToken] = useState(() => loadCurrentToken())
+  const [checkingSession, setCheckingSession] = useState(() => Boolean(loadCurrentToken()))
   const [email, setEmail] = useState('')
   const [profileImage, setProfileImage] = useState(null)
   const [page, setPage] = useState(authPage.login)
 
   useEffect(() => {
+    let active = true
+
     const loadEmailFromToken = async () => {
       if (!token) {
-        setEmail('')
-        setProfileImage(null)
+        if (active) {
+          setEmail('')
+          setProfileImage(null)
+          setCheckingSession(false)
+        }
         return
       }
 
+      setCheckingSession(true)
+
       try {
         const data = await requestAuthApi(token, '/profile')
+
+        if (!active) return
+
         if (data?.email) {
           setEmail(data.email)
           setProfileImage(data.profilePicture ?? null)
           setCurrentSession(token)
+        } else {
+          throw new Error('Invalid session')
         }
       } catch (err) {
+        if (!active) return
+
         console.error('Failed to load email:', err)
         clearCurrentSession()
         setToken(null)
         setEmail('')
         setProfileImage(null)
+      } finally {
+        if (active) setCheckingSession(false)
       }
     }
 
     loadEmailFromToken()
+
+    return () => {
+      active = false
+    }
   }, [token])
 
   const login = (newToken, email, profilePicture = null) => {
@@ -103,6 +124,7 @@ export default function App() {
     setToken(newToken)
     setEmail(email)
     setProfileImage(profilePicture)
+    setCheckingSession(false)
   }
 
   const logout = () => {
@@ -110,6 +132,11 @@ export default function App() {
     setToken(null)
     setEmail('')
     setProfileImage(null)
+    setCheckingSession(false)
+  }
+
+  if (checkingSession) {
+    return null
   }
 
   if (!token) {

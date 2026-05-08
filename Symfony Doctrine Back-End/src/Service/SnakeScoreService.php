@@ -20,9 +20,6 @@ class SnakeScoreService
         private readonly DataService $dataService,
     ) {}
 
-    /**
-     * @return array<string, mixed>
-     */
     public function startRun(User $user): array
     {
         return [
@@ -32,9 +29,6 @@ class SnakeScoreService
         ];
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     public function recordEvent(User $user, mixed $runToken, mixed $points): array
     {
         if (!is_string($runToken) || $runToken === '') {

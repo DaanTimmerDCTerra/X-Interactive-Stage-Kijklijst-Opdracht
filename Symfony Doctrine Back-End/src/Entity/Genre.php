@@ -15,7 +15,7 @@ class Genre
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 100)]
+    #[ORM\Column(length: 100, unique: true)]
     private ?string $name = null;
 
     #[ORM\ManyToMany(targetEntity: Title::class, mappedBy: 'genres')]

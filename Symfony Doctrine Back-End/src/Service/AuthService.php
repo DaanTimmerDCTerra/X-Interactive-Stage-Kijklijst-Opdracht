@@ -36,6 +36,10 @@ class AuthService
             throw new UnauthorizedHttpException('Bearer', 'Unauthorized');
         }
 
+        if ($user->getEmail() !== $payload->email) {
+            throw new UnauthorizedHttpException('Bearer', 'Unauthorized');
+        }
+
         return $user;
     }
 

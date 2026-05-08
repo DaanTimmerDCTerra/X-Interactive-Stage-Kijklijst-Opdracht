@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Genre;
+use App\Service\AuthService;
 use App\Service\DataService;
 use App\Service\SerializerService;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,11 +18,14 @@ final class GenreController extends ApiController
     public function __construct(
         private readonly DataService $dataService,
         private readonly SerializerService $serializer,
+        private readonly AuthService $authService,
     ) {}
 
     #[Route('', methods: ['GET'])]
-    public function index(): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $this->authService->requireAuthenticatedUser($request);
+
         $genres = $this->dataService->findAll(Genre::class);
         return $this->json(array_map(fn($g) => $this->serializer->serializeGenre($g), $genres));
     }
@@ -29,6 +33,8 @@ final class GenreController extends ApiController
     #[Route('', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
+        $this->authService->requireAuthenticatedUser($request);
+
         $body = $this->jsonBody($request);
         if ($body instanceof JsonResponse) {
             return $body;
@@ -53,8 +59,14 @@ final class GenreController extends ApiController
     }
 
     #[Route('/{id}', methods: ['DELETE'])]
-    public function delete(Genre $genre): JsonResponse
+    public function delete(Genre $genre, Request $request): JsonResponse
     {
+        $this->authService->requireAuthenticatedUser($request);
+
+        if (!$genre->getTitles()->isEmpty()) {
+            return $this->badRequest('Genre is nog gekoppeld aan een titel.');
+        }
+
         $this->dataService->removeAndFlush($genre);
         return $this->json(null, 204);
     }

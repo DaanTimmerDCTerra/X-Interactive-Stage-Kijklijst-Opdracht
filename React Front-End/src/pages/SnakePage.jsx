@@ -276,7 +276,7 @@ function drawSnake(ctx, image, state, progress) {
 }
 
 function drawScene(ctx, image, state, now) {
-    const progress = Math.min((now - state.lastTick) / TICK_MS, 1)
+    const progress = Math.min(Math.max((now - state.lastTick) / TICK_MS, 0), 1)
 
     drawBackground(ctx)
     drawWalls(ctx, image)
@@ -298,6 +298,7 @@ export default function SnakePage({ token }) {
     const [best, setBest] = useState(0)
     const [phase, setPhase] = useState(PHASE.IDLE)
     const [error, setError] = useState(null)
+    const [spriteReady, setSpriteReady] = useState(false)
 
     const stopLoop = useCallback(() => {
         if (frameRef.current) cancelAnimationFrame(frameRef.current)
@@ -384,6 +385,12 @@ export default function SnakePage({ token }) {
         if (phase === PHASE.STARTING) return
 
         setError(null)
+
+        if (!spriteReady || !spriteRef.current || !contextRef.current) {
+            setError('Spel is nog aan het laden.')
+            return
+        }
+
         setPhase(PHASE.STARTING)
 
         try {
@@ -402,14 +409,20 @@ export default function SnakePage({ token }) {
             if (Number.isFinite(serverBest)) setBest(serverBest)
 
             stopLoop()
-            setPhase(PHASE.PLAYING)
-            frameRef.current = requestAnimationFrame(loop)
+            drawScene(contextRef.current, spriteRef.current, gameRef.current, now)
+            frameRef.current = requestAnimationFrame((frameNow) => {
+                if (!gameRef.current) return
+
+                gameRef.current.lastTick = frameNow
+                setPhase(PHASE.PLAYING)
+                frameRef.current = requestAnimationFrame(loop)
+            })
         } catch {
             runTokenRef.current = null
             setPhase(PHASE.IDLE)
             setError('Spel kon niet worden gestart.')
         }
-    }, [loop, phase, stopLoop, token])
+    }, [loop, phase, spriteReady, stopLoop, token])
 
     useEffect(() => {
         const canvas = canvasRef.current
@@ -426,7 +439,10 @@ export default function SnakePage({ token }) {
 
         sprite.src = '/snake.png'
         sprite.onload = () => {
-            if (!cancelled) spriteRef.current = sprite
+            if (!cancelled) {
+                spriteRef.current = sprite
+                setSpriteReady(true)
+            }
         }
 
         return () => {
@@ -488,7 +504,7 @@ export default function SnakePage({ token }) {
     }
 
     const startButtonLabel =
-        phase === PHASE.STARTING
+        phase === PHASE.STARTING || !spriteReady
             ? 'Laden...'
             : phase === PHASE.DEAD
                 ? 'Opnieuw spelen'
@@ -536,7 +552,7 @@ export default function SnakePage({ token }) {
                                 type="button"
                                 onClick={startGame}
                                 className="snake-start-button"
-                                disabled={phase === PHASE.STARTING}
+                                disabled={phase === PHASE.STARTING || !spriteReady}
                             >
                                 {startButtonLabel}
                             </button>

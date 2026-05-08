@@ -208,9 +208,6 @@ final class AuthController extends ApiController
         return is_string($password) && mb_strlen($password) >= self::MIN_PASSWORD_LENGTH;
     }
 
-    /**
-     * @return array<string, mixed>
-     */
     private function serializeUser(User $user): array
     {
         return [

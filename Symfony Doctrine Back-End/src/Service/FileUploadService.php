@@ -72,7 +72,7 @@ class FileUploadService
             throw new InvalidArgumentException($label . ' moet een jpg, png of webp afbeelding zijn.');
         }
 
-        $filename = uniqid($prefix, true) . '.' . self::IMAGE_EXTENSIONS[$mimeType];
+        $filename = $prefix . bin2hex(random_bytes(16)) . '.' . self::IMAGE_EXTENSIONS[$mimeType];
 
         try {
             $file->move($uploadDir, $filename);

@@ -11,5 +11,7 @@ export function clearCurrentSession() {
 }
 
 export function loadCurrentToken() {
-    return localStorage.getItem(storageKeys.token)
+    const token = localStorage.getItem(storageKeys.token)
+
+    return token && token !== 'null' && token !== 'undefined' ? token : null
 }
