@@ -1,6 +1,12 @@
 # Film en Serie Tracker
 Kijklijst-app voor films en series. Backend: Symfony, Doctrine en SQLite. Frontend: React/Vite als uitbreiding op de basisopdracht.
 
+## Voorgemaakt account
+```bash
+admin@gmail.com
+admin123!
+```
+
 ## Starten
 Back-end:
 ```bash
