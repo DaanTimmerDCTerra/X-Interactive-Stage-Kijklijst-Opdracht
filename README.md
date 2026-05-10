@@ -1,14 +1,15 @@
 # Film en Serie Tracker
-Kijklijst-app voor films en series. Backend: Symfony, Doctrine en SQLite. Frontend: React/Vite als uitbreiding op de basisopdracht.
+Kijklijst-app voor films en series.  
+Backend: Symfony, Doctrine en SQLite.  
+Frontend: React/Vite als uitbreiding op de basisopdracht.
 
 ## Voorgemaakt account
-```markdown
 Gebruikersnaam: `admin@gmail.com`  
 Wachtwoord: `admin123!`
-```
 
 ## Starten
 Back-end:
+
 ```bash
 cd "Symfony Doctrine Back-End"
 composer install
@@ -26,57 +27,100 @@ Open daarna `http://localhost:5173`.
 `composer install` is alleen nodig als de back-end dependencies nog ontbreken. `npm install` is alleen nodig als de front-end dependencies nog ontbreken.
 
 ## Af
-- Symfony/Doctrine backend met SQLite database en migraties voor gebruikers, titels en genres.
-- `Title`, `User` en `Genre` entities met Doctrine-relaties.
-- Registeren en inloggen met JWT-authenticatie.
+- Symfony/Doctrine backend met SQLite database.
+- User, Title en Genre entities met Doctrine-relaties.
+- Registreren en inloggen met JWT-authenticatie.
 - Eigen kijklijst per gebruiker.
-- API voor titels ophalen, detail bekijken, toevoegen, bewerken en verwijderen.
+- API om titels op te halen, details te bekijken, toe te voegen, te bewerken en te verwijderen.
 - Gezien- en favoriet-status aanpassen.
 - Zoeken en filteren op type, gezien-status, favorieten en genre.
-- Genres als aparte entity met relatie naar titels, inclusief endpoints om genres op te halen, toe te voegen en te verwijderen.
+- Endpoints om genres op te halen, toe te voegen en te verwijderen.
 - Inputvalidatie voor titels, genres, jaren en verplichte velden.
 - Thumbnail upload voor titels.
 - Profielfoto upload en profielpagina.
 - React/Vite frontend met routes voor home, mijn lijst, toevoegen, detail, bewerken, profiel en Snake.
-- Formulieren voor toevoegen/bewerken met genreselectie, nieuw genre toevoegen en uploadvelden.
+- Formulieren voor toevoegen en bewerken.
+- Genreselectie en nieuw genre toevoegen.
+- Uploadvelden voor thumbnails en profielfoto’s.
 - Detailpagina voor titels.
-- CORS-configuratie voor communicatie tussen frontend en backend.
-- Backendlogica opgesplitst in services voor auth, uploads, serialisatie, titelvalidatie/data en Snake-score.
+- CORS-configuratie zodat frontend en backend met elkaar kunnen communiceren.
+- Backendlogica opgesplitst in services voor auth, uploads, serialisatie, titelvalidatie/data en - Snake-score.
 - Snake minigame met score-events en high score per gebruiker.
 
 ## Niet af
 - Geen rating van 1 tot 5 sterren.
 
 ## Aanpak
-Ik ben op ``4 mei`` begonnen met de backend. Eerst heb ik het Symfony project opgezet en de basis entities aangemaakt (`User` en `Title`) als startpunt, zonder verdere logica. Daarna heb ik `User` uitgewerkt met register/login en JWT. JWT is gekozen omdat het stateless werkt, de backend hoeft geen sessie bij te houden en het token is makkelijk mee te sturen in elke API-request via een `Authorization` header. Zo stond authenticatie als fundament klaar voordat de rest erbovenop werd gebouwd.
+- Ik ben op 4 mei begonnen met de backend. Eerst heb ik het Symfony-project aangemaakt en de basis van het project opgezet. Daarbij heb ik de eerste entities gemaakt, namelijk User en Title. In het begin zat daar nog niet veel logica in. Het was vooral bedoeld om alvast een goede structuur neer te zetten waar ik later op kon verder bouwen.
 
-Voor de database type is SQLite gekozen omdat dit het enige databasesysteem is waarmee ik bekend ben vanuit mijn opleiding.
+- Daarna ben ik begonnen met het gebruikerssysteem. Ik heb registreren en inloggen toegevoegd en daarvoor JWT gebruikt. Ik heb voor JWT gekozen omdat de backend dan geen gewone sessies hoeft bij te houden. De frontend kan het token opslaan en bij beveiligde API-requests meesturen via de Authorization header. Dit wilde ik eerst goed werkend hebben, omdat bijna alle andere functies afhankelijk zijn van de ingelogde gebruiker.
 
-Vervolgens heb ik `Title` uitgewerkt met de belangrijkste velden voor films en series, gekoppeld aan de ingelogde gebruiker, en de endpoints gebouwd om titels op te halen, toe te voegen en te verwijderen.
+- Voor de database heb ik SQLite gekozen. Dat was voor mij de meest logische keuze, omdat ik daar vanuit mijn opleiding al mee bekend was. Ook is SQLite makkelijk lokaal te gebruiken, omdat je geen aparte database-server hoeft op te zetten.
 
-Op ``5 mei`` heb ik de React frontend opgezet en gekoppeld aan de API. Voor de frontend is gekozen voor React met Vite. Vite is snel in development omdat het bij elke opgeslagen wijziging de browser automatisch ververst zonder de hele pagina te herladen, waardoor je direct het resultaat ziet zonder handmatig te refreshen. React maakt het beheren van state, zoals filters, favorieten en bewerkformulieren, overzichtelijker dan plain JavaScript.
+- Toen de login en registratie werkten, ben ik verder gegaan met de Title entity. Ik heb de belangrijkste velden toegevoegd die ik nodig had voor films en series. Daarna heb ik titels gekoppeld aan de ingelogde gebruiker, zodat elke gebruiker zijn eigen kijklijst heeft. Vervolgens heb ik de eerste endpoints gemaakt om titels op te halen, toe te voegen en te verwijderen.
 
-Eerst kwamen gedeelde helpers, auth-formulieren en de hoofdschermen. Daarna heb ik pagina's toegevoegd voor toevoegen, lijst, detail, profiel en Snake. De focus lag toen op een werkende flow van frontend naar backend.
+- Op 5 mei ben ik begonnen met de React-frontend. Hiervoor heb ik Vite gebruikt, omdat dit snel werkt tijdens het designen. Als je een wijziging opslaat, zie je die bijna direct terug in de browser. Dat maakte het testen van formulieren, styling, filters en pagina’s een stuk makkelijker. React vond ik handig omdat ik veel state moest bijhouden, bijvoorbeeld voor ingelogd zijn, filters, favorieten en bewerkformulieren.
 
-Op ``7 mei`` heb ik vooral gerefactored. Frontend pagina's zijn opgesplitst in duidelijkere componenten en backendlogica is uit controllers gehaald. Services zoals `TitleService`, `AuthService`, `FileUploadService`, `SerializerService` en `SnakeScoreService` zorgen ervoor dat controllers vooral request en response regelen. Dit maakt de code beter leesbaar, voorkomt dat validatie, uploads en game-logica door elkaar staan, en maakt losse onderdelen makkelijker te isoleren.
+- In de frontend ben ik eerst begonnen met de basis. Ik heb helpers gemaakt voor API-calls, daarna de login- en registratieformulieren en vervolgens de hoofdschermen. Daarna heb ik pagina’s toegevoegd voor mijn lijst, titel toevoegen, detail bekijken, titel bewerken, profiel en Snake. De focus lag op dat moment vooral op een werkende flow: inloggen, data uit de backend ophalen en die via de frontend kunnen aanpassen.
 
-Daarna heb ik uitbreidingen afgerond: genres als aparte entity, filters, uploads, CORS en kleine cleanup. Genres zijn gekoppeld aan titels, zodat dezelfde genres opnieuw gebruikt kunnen worden en filters logisch blijven. Uploads zijn apart verwerkt, omdat `multipart/form-data` anders binnenkomt dan JSON.
+- Op 7 mei heb ik vooral code opgeschoond en beter verdeeld. In de backend merkte ik dat sommige controllers te groot werden, omdat daar validatie, uploads en andere logica door elkaar stonden. Daarom heb ik logica verplaatst naar services, zoals `TitleService`, `AuthService`, `FileUploadService`, `SerializerService` en `SnakeScoreService`. Hierdoor regelen de controllers vooral nog de request en response, terwijl de echte logica in aparte classes staat.
+
+- Ook in de frontend heb ik onderdelen opgesplitst in duidelijkere componenten. Dat was nodig omdat zoeken, filteren, favorieten, bewerken en uploaden tegelijk snel rommelig werden. Door onderdelen losser te maken, werd de code overzichtelijker en makkelijker aan te passen.
+
+- Daarna heb ik de uitbreidingen verder afgerond. Ik heb genres als aparte entity toegevoegd, zodat meerdere titels hetzelfde genre kunnen gebruiken. Dat maakt het filteren op genre ook logischer. Verder heb ik uploads toegevoegd voor thumbnails en profielfoto’s. Uploads moesten apart verwerkt worden, omdat bestanden via `multipart/form-data` binnenkomen en dus anders werken dan normale JSON-requests.
+
+- Ook heb ik CORS ingesteld, omdat de frontend en backend op verschillende poorten draaien. Zonder die configuratie kon de frontend geen requests naar de backend sturen. Daarnaast heb ik nog kleine verbeteringen gedaan en onderdelen opgeschoond.
+
+- De Snake-minigame heb ik als extra uitbreiding toegevoegd. Hierbij heb ik ervoor gezorgd dat er score-events zijn en dat de high score per gebruiker wordt opgeslagen. Daarbij moest ik opletten dat de frontend niet zomaar elke score kon overschrijven.
 
 ## Tijd
-Bijgehouden werktijd: 4 Mei, 01:26:14.40, 5 Mei, 03:02:42.28 en 7 Mei, 01:33:17.59. Totaal 06:02:14.27.
+Bijgehouden werktijd:
+
+- 4 mei: 01:26:14.40
+- 5 mei: 03:02:42.28
+- 7 mei: 01:33:17.59
+
+- Totaal: 06:02:14.27
 
 ## Handmatig getest
-Registreren, inloggen, sessie herstellen, titels toevoegen/bewerken/verwijderen, favoriet/gezien toggles, zoeken, filters, genres toevoegen/koppelen, thumbnails uploaden, profielfoto uploaden, detailpagina en Snake score.
+Ik heb de volgende onderdelen handmatig getest:
+- Registreren.
+- Inloggen.
+- Sessie herstellen.
+- Titels toevoegen.
+- Titels bewerken.
+- Titels verwijderen.
+- Favoriet-status aanpassen.
+- Gezien-status aanpassen.
+- Zoeken.
+- Filters gebruiken.
+- Genres toevoegen.
+- Genres koppelen aan titels.
+- Thumbnails uploaden.
+- Profielfoto uploaden.
+- Detailpagina bekijken.
+- Snake score opslaan.
 
 ## Tegenaan gelopen
-- CORS: frontend en backend draaien op andere hosts/poorten.
-- JSON en upload requests moesten naast elkaar werken.
-- Scope bewaken was lastig door de extra uitbreidingen.
-- JWT-auth goed koppelen aan de frontend was even zoeken, vooral met tokens bewaren en meesturen bij requests.
-- Doctrine relaties tussen gebruikers, titels en genres moesten goed staan, anders kwamen data en filters niet logisch terug.
-- Bij uploads moest ik rekening houden met bestandsnamen, mapstructuur en oude/lege afbeeldingen.
-- De Snake high score moest eerlijk worden opgeslagen per gebruiker, zonder dat de frontend zomaar een score kon overschrijven.
-- Frontend state werd snel rommelig toen zoeken, filteren, bewerken en favorieten tegelijk moesten werken.
+- Tijdens het project liep ik tegen meerdere dingen aan. CORS was een van de eerste problemen, omdat de frontend en backend op andere hosts/poorten draaien. Daardoor werden requests eerst geblokkeerd totdat de CORS-instellingen goed stonden.
+
+- Ook moest ik JSON-requests en upload-requests naast elkaar laten werken. Normale data komt binnen als JSON, maar bestanden komen binnen via multipart/form-data. Daardoor moest ik uploads apart behandelen.
+
+- JWT-authenticatie koppelen aan de frontend was ook even zoeken. Vooral het bewaren van het token en het meesturen bij beveiligde requests moest goed gebeuren, anders werkte de ingelogde gebruikersdata niet goed.
+
+- Bij Doctrine moest ik goed letten op de relaties tussen gebruikers, titels en genres. Als die relaties niet goed stonden, kwamen data en filters niet logisch terug uit de API.
+
+- Bij uploads moest ik rekening houden met bestandsnamen, de mapstructuur en situaties waarin een afbeelding leeg was of vervangen werd door een nieuwe afbeelding.
+
+- De Snake high score was ook een aandachtspunt. Ik wilde dat de score per gebruiker eerlijk werd opgeslagen en dat de frontend niet zomaar een bestaande score kon overschrijven met een lagere of ongeldige score.
+
+- In de frontend werd state snel rommelig toen zoeken, filteren, bewerken en favorieten tegelijk moesten werken. Daarom heb ik later onderdelen opgesplitst en code beter verdeeld.
+
+- Ook was het soms lastig om de scope te bewaken. Ik heb extra functies toegevoegd bovenop de basisopdracht, zoals genres, uploads, een profielpagina en Snake. Daardoor moest ik opletten dat het project niet te groot werd.
 
 ## AI-tools
-Ik heb ChatGPT/Codex gebruikt als hulpmiddel tijdens het project. Ik heb AI gebruikt voor inspiratie bij backend functie-logica, als leerproces om Symfony/Doctrine beter te begrijpen, voor review op inconsistenties, refactor-keuzes en CORS/API-config. Daarnaast heb ik hulp gevraagd bij frontend styling en bij de wiskundige logica van Snake, zoals beweging, botsingen en scoreverwerking. De code heb ik zelf aangepast, getest en passend gemaakt voor mijn project.
+- Ik heb Codex gebruikt als hulpmiddel tijdens het project. Ik heb AI vooral gebruikt om mee te denken over backend functie-logica, Symfony/Doctrine beter te begrijpen, inconsistenties te vinden en keuzes voor refactoring te controleren.
+
+- Ook heb ik AI gebruikt voor hulp bij frontend styling en de wiskundige logica van Snake, zoals beweging, botsingen en scoreverwerking.
+
+- Ik heb de code wat AI was zelf weer aangepast, getest en passend gemaakt voor mijn project. Ook heb ik gecontroleerd of de onderdelen goed samenwerkten met mijn eigen backend, frontend en database-structuur.
