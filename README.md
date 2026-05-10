@@ -28,7 +28,7 @@ Open daarna `http://localhost:5173`.
 
 ## Af
 - Symfony/Doctrine backend met SQLite database.
-- User, Title en Genre entities met Doctrine-relaties.
+- ``User``, ``Title`` en ``Genre`` entities met Doctrine-relaties.
 - Registreren en inloggen met JWT-authenticatie.
 - Eigen kijklijst per gebruiker.
 - API om titels op te halen, details te bekijken, toe te voegen, te bewerken en te verwijderen.
@@ -51,19 +51,19 @@ Open daarna `http://localhost:5173`.
 - Geen rating van 1 tot 5 sterren.
 
 ## Aanpak
-- Ik ben op 4 mei begonnen met de backend. Eerst heb ik het Symfony-project aangemaakt en de basis van het project opgezet. Daarbij heb ik de eerste entities gemaakt, namelijk User en Title. In het begin zat daar nog niet veel logica in. Het was vooral bedoeld om alvast een goede structuur neer te zetten waar ik later op kon verder bouwen.
+- Ik ben op `4 mei` begonnen met de backend. Eerst heb ik het Symfony-project aangemaakt en de basis van het project opgezet. Daarbij heb ik de eerste entities gemaakt, namelijk ``User en Title``. In het begin zat daar nog niet veel logica in. Het was vooral bedoeld om alvast een goede structuur neer te zetten waar ik later op kon verder bouwen.
 
 - Daarna ben ik begonnen met het gebruikerssysteem. Ik heb registreren en inloggen toegevoegd en daarvoor JWT gebruikt. Ik heb voor JWT gekozen omdat de backend dan geen gewone sessies hoeft bij te houden. De frontend kan het token opslaan en bij beveiligde API-requests meesturen via de Authorization header. Dit wilde ik eerst goed werkend hebben, omdat bijna alle andere functies afhankelijk zijn van de ingelogde gebruiker.
 
 - Voor de database heb ik SQLite gekozen. Dat was voor mij de meest logische keuze, omdat ik daar vanuit mijn opleiding al mee bekend was. Ook is SQLite makkelijk lokaal te gebruiken, omdat je geen aparte database-server hoeft op te zetten.
 
-- Toen de login en registratie werkten, ben ik verder gegaan met de Title entity. Ik heb de belangrijkste velden toegevoegd die ik nodig had voor films en series. Daarna heb ik titels gekoppeld aan de ingelogde gebruiker, zodat elke gebruiker zijn eigen kijklijst heeft. Vervolgens heb ik de eerste endpoints gemaakt om titels op te halen, toe te voegen en te verwijderen.
+- Toen de login en registratie werkten, ben ik verder gegaan met de ``Title`` entity. Ik heb de belangrijkste velden toegevoegd die ik nodig had voor films en series. Daarna heb ik titels gekoppeld aan de ingelogde gebruiker, zodat elke gebruiker zijn eigen kijklijst heeft. Vervolgens heb ik de eerste endpoints gemaakt om titels op te halen, toe te voegen en te verwijderen.
 
-- Op 5 mei ben ik begonnen met de React-frontend. Hiervoor heb ik Vite gebruikt, omdat dit snel werkt tijdens het designen. Als je een wijziging opslaat, zie je die bijna direct terug in de browser. Dat maakte het testen van formulieren, styling, filters en pagina’s een stuk makkelijker. React vond ik handig omdat ik veel state moest bijhouden, bijvoorbeeld voor ingelogd zijn, filters, favorieten en bewerkformulieren.
+- Op ``5 mei`` ben ik begonnen met de React-frontend. Hiervoor heb ik Vite gebruikt, omdat dit snel werkt tijdens het designen. Als je een wijziging opslaat, zie je die bijna direct terug in de browser. Dat maakte het testen van formulieren, styling, filters en pagina’s een stuk makkelijker. React vond ik handig omdat ik veel state moest bijhouden, bijvoorbeeld voor ingelogd zijn, filters, favorieten en bewerkformulieren.
 
 - In de frontend ben ik eerst begonnen met de basis. Ik heb helpers gemaakt voor API-calls, daarna de login- en registratieformulieren en vervolgens de hoofdschermen. Daarna heb ik pagina’s toegevoegd voor mijn lijst, titel toevoegen, detail bekijken, titel bewerken, profiel en Snake. De focus lag op dat moment vooral op een werkende flow: inloggen, data uit de backend ophalen en die via de frontend kunnen aanpassen.
 
-- Op 7 mei heb ik vooral code opgeschoond en beter verdeeld. In de backend merkte ik dat sommige controllers te groot werden, omdat daar validatie, uploads en andere logica door elkaar stonden. Daarom heb ik logica verplaatst naar services, zoals `TitleService`, `AuthService`, `FileUploadService`, `SerializerService` en `SnakeScoreService`. Hierdoor regelen de controllers vooral nog de request en response, terwijl de echte logica in aparte classes staat.
+- Op ``7 mei`` heb ik vooral code opgeschoond en beter verdeeld. In de backend merkte ik dat sommige controllers te groot werden, omdat daar validatie, uploads en andere logica door elkaar stonden. Daarom heb ik logica verplaatst naar services, zoals `TitleService`, `AuthService`, `FileUploadService`, `SerializerService` en `SnakeScoreService`. Hierdoor regelen de controllers vooral nog de request en response, terwijl de echte logica in aparte classes staat.
 
 - Ook in de frontend heb ik onderdelen opgesplitst in duidelijkere componenten. Dat was nodig omdat zoeken, filteren, favorieten, bewerken en uploaden tegelijk snel rommelig werden. Door onderdelen losser te maken, werd de code overzichtelijker en makkelijker aan te passen.
 
