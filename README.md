@@ -80,7 +80,7 @@ Bijgehouden werktijd:
 - 5 mei: 03:02:42.28
 - 7 mei: 01:33:17.59
 
-- Totaal: 06:02:14.27
+- ``Totaal: 06:02:14.27``
 
 ## Handmatig getest
 Ik heb de volgende onderdelen handmatig getest:
