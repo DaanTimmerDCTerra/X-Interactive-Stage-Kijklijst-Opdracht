@@ -86,13 +86,12 @@ Bijgehouden werktijd:
 Ik heb de volgende onderdelen handmatig getest:
 - Registreren.
 - Inloggen.
-- Sessie herstellen.
 - Titels toevoegen.
 - Titels bewerken.
 - Titels verwijderen.
 - Favoriet-status aanpassen.
 - Gezien-status aanpassen.
-- Zoeken.
+- Titels Searchbar.
 - Filters gebruiken.
 - Genres toevoegen.
 - Genres koppelen aan titels.
